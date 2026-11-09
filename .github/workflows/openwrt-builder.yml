@@ -91,13 +91,25 @@ jobs:
       id: compile
       run: |
         cd openwrt
-        # Disable mt7621-vendor HNAT driver compilation
-        # Method: Modify kernel config to disable HNAT
-        echo "CONFIG_NET_HNAT=n" >> target/linux/ramips/mt7621/config-6.18 || true
-        echo "CONFIG_NET_MEDIATEK_HNAT=n" >> target/linux/ramips/mt7621/config-6.18 || true
-        # Also try to remove the driver source
-        rm -rf target/linux/ramips/files-6.18/drivers/net/ethernet/mt7621-vendor/mtk_hnat || true
-        rm -rf target/linux/ramips/files-6.18/drivers/net/ethernet/mt7621-vendor || true
+        # First, extract kernel source
+        make target/linux/prepare V=s || true
+        # Find and fix hnat_mcast.c in build_dir
+        HNAT_FILE=$(find build_dir -name "hnat_mcast.c" -path "*mt7621-vendor*" 2>/dev/null | head -1)
+        if [ -n "$HNAT_FILE" ]; then
+          echo "Found hnat_mcast.c at: $HNAT_FILE"
+          # Fix the bind() call - remove third argument
+          sed -i 's/(struct sockaddr \*)&hnat_mcast_addr, 0)/(struct sockaddr *)&hnat_mcast_addr)/' "$HNAT_FILE"
+          echo "Fixed bind() call:"
+          grep -A1 "sock->ops->bind" "$HNAT_FILE" || echo "Pattern not found"
+        else
+          echo "Warning: hnat_mcast.c not found in build_dir"
+          find build_dir -name "hnat_mcast.c" 2>/dev/null | head -5
+        fi
+        # Also fix in target directory for future builds
+        if [ -f target/linux/ramips/files-6.18/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c ]; then
+          sed -i 's/(struct sockaddr \*)&hnat_mcast_addr, 0)/(struct sockaddr *)&hnat_mcast_addr)/' target/linux/ramips/files-6.18/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c
+          echo "Also fixed target directory copy"
+        fi
         # Now compile
         echo -e "$(nproc) thread compile"
         make -j$(nproc) || make -j1 || make -j1 V=s
