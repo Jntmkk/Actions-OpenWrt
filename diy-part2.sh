@@ -20,21 +20,13 @@
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
 
 # Fix mt7621-vendor hnat_mcast.c compilation error on Linux 6.18
-# The issue: sock->ops->bind expects different pointer type in newer kernels
-if [ -f target/linux/ramips/patches-6.18/999-fix-hnat-mcast.patch ]; then
-  echo "Patch file already exists"
+# Method: Modify the source code directly to fix the bind() call
+HNAT_FILE="target/linux/ramips/files-6.18/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c"
+if [ -f "$HNAT_FILE" ]; then
+  sed -i 's/sock->ops->bind(sock,/sock->ops->bind(sock,/' "$HNAT_FILE"
+  # Remove the third argument (addrlen) if it exists
+  sed -i 's/(struct sockaddr \*)&hnat_mcast_addr, 0)/(struct sockaddr *)&hnat_mcast_addr)/' "$HNAT_FILE"
+  echo "Fixed hnat_mcast.c bind() call"
 else
-  cat > target/linux/ramips/patches-6.18/999-fix-hnat-mcast.patch << 'EOF'
---- a/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c
-+++ b/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c
-@@ -241,7 +241,7 @@
- 	}
-
- 	ret = sock->ops->bind(sock,
--			      (struct sockaddr *)&hnat_mcast_addr, 0);
-+			      (struct sockaddr *)&hnat_mcast_addr);
- 	if (ret < 0) {
- 		pr_err("%s: bind socket failed\n", __func__);
- 		goto err_bind;
-EOF
+  echo "Warning: hnat_mcast.c not found at $HNAT_FILE"
 fi
