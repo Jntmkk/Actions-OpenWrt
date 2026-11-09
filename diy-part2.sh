@@ -18,3 +18,23 @@
 
 # Modify hostname
 #sed -i 's/OpenWrt/P3TERX-Router/g' package/base-files/files/bin/config_generate
+
+# Fix mt7621-vendor hnat_mcast.c compilation error on Linux 6.18
+# The issue: sock->ops->bind expects different pointer type in newer kernels
+if [ -f target/linux/ramips/patches-6.18/999-fix-hnat-mcast.patch ]; then
+  echo "Patch file already exists"
+else
+  cat > target/linux/ramips/patches-6.18/999-fix-hnat-mcast.patch << 'EOF'
+--- a/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c
++++ b/drivers/net/ethernet/mt7621-vendor/mtk_hnat/hnat_mcast.c
+@@ -241,7 +241,7 @@
+ 	}
+
+ 	ret = sock->ops->bind(sock,
+-			      (struct sockaddr *)&hnat_mcast_addr, 0);
++			      (struct sockaddr *)&hnat_mcast_addr);
+ 	if (ret < 0) {
+ 		pr_err("%s: bind socket failed\n", __func__);
+ 		goto err_bind;
+EOF
+fi
