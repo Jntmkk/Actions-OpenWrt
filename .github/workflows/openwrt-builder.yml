@@ -87,6 +87,20 @@ jobs:
         find dl -size -1024c -exec ls -l {} \;
         find dl -size -1024c -exec rm -f {} \;
 
+    - name: Fix mt7621-vendor kernel driver
+      run: |
+        cd openwrt
+        # Find and fix hnat_mcast.c
+        HNAT_FILE=$(find build_dir -name "hnat_mcast.c" -path "*mt7621-vendor*" 2>/dev/null | head -1)
+        if [ -n "$HNAT_FILE" ]; then
+          echo "Fixing $HNAT_FILE"
+          sed -i 's/(struct sockaddr \*)&hnat_mcast_addr, 0)/(struct sockaddr *)&hnat_mcast_addr)/' "$HNAT_FILE"
+          grep -n "hnat_mcast_addr" "$HNAT_FILE" | head -5
+        else
+          echo "hnat_mcast.c not found, trying alternative path"
+          find . -name "hnat_mcast.c" 2>/dev/null | head -5
+        fi
+
     - name: Compile the firmware
       id: compile
       run: |
